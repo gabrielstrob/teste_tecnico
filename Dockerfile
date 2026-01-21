@@ -1,5 +1,5 @@
 # Dockerfile para a API RAG com suporte a OCR
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 # Define diretorio de trabalho
 WORKDIR /app
