@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Orquestracao de RAG otimizado via LangChain LCEL com cache e retrievers avancados."""
+"""Orquestracao de RAG via LangChain com cache e retrievers ."""
 
 import logging
 import uuid
@@ -23,11 +23,11 @@ async def generate_answer(
     history: list[dict[str, Any]],
     docs: list[dict[str, Any]],
 ) -> str:
-    """Gera resposta usando RAG otimizado com LangChain LCEL.
+    """Gera resposta usando RAG com LangChain.
     
     Otimizacoes aplicadas:
     - Cache de respostas LLM em memoria
-    - Prompt otimizado com LCEL
+    - Prompt com LCEL
     - Historico limitado para evitar contexto muito grande
     """
     return await rag_generate_answer(settings, question, history, docs)
@@ -38,7 +38,7 @@ async def retrieve_context(
     settings: Settings,
     question: str,
 ) -> list[dict[str, Any]]:
-    """Busca documentos relevantes com retriever otimizado.
+    """Busca documentos relevantes com retriever.
     
     Otimizacoes aplicadas:
     - Cache de embeddings de queries
@@ -54,7 +54,7 @@ async def run_rag_pipeline(
     question: str,
     history: list[dict[str, Any]],
 ) -> tuple[str, list[dict[str, Any]]]:
-    """Executa pipeline RAG completo de forma otimizada.
+    """Executa pipeline RAG completo.
     
     Esta funcao combina retrieve + generate em uma unica chamada,
     evitando overhead de multiplas inicializacoes.

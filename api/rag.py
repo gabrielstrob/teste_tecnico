@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""RAG otimizado com LangChain: query preprocessing, hybrid search e cache."""
+"""RAG com LangChain: query preprocessing, hybrid search e cache."""
 
 import asyncio
 import hashlib
@@ -24,11 +24,6 @@ from langchain_core.caches import InMemoryCache
 from .config import Settings
 
 logger = logging.getLogger(__name__)
-
-
-# ============================================================================
-# PREPROCESSAMENTO DE QUERY
-# ============================================================================
 
 def preprocess_query(query: str) -> str:
     """Preprocessa a query para melhorar matching.
@@ -80,11 +75,6 @@ def extract_keywords(text: str) -> list[str]:
     keywords = [w for w in words if w not in stopwords and len(w) > 2]
     return keywords
 
-
-# ============================================================================
-# CACHE GLOBAL
-# ============================================================================
-
 # Cache de embeddings de queries (evita recalcular para perguntas repetidas)
 _query_embedding_cache: dict[str, list[float]] = {}
 _cache_initialized = False
@@ -103,10 +93,6 @@ def _cache_key(text: str, model: str) -> str:
     """Gera chave de cache para embedding."""
     return hashlib.md5(f"{model}:{text}".encode()).hexdigest()
 
-
-# ============================================================================
-# EMBEDDINGS OTIMIZADOS
-# ============================================================================
 
 class CachedHuggingFaceEmbeddings(Embeddings):
     """Wrapper com cache para HuggingFaceEmbeddings."""
@@ -150,11 +136,6 @@ class CachedHuggingFaceEmbeddings(Embeddings):
 def get_embeddings(model_name: str) -> CachedHuggingFaceEmbeddings:
     """Singleton para embeddings."""
     return CachedHuggingFaceEmbeddings(model_name)
-
-
-# ============================================================================
-# RAG CHAIN OTIMIZADA
-# ============================================================================
 
 class RAGChain:
     """Chain RAG com todos os componentes otimizados."""
@@ -219,7 +200,7 @@ Contexto:
         source_filter: str | None = None,
         metadata_filter: dict[str, Any] | None = None,
     ) -> list[Document]:
-        """Recupera documentos relevantes com busca hibrida otimizada.
+        """Recupera documentos relevantes com busca hibrida.
         
         Melhorias aplicadas:
         - Preprocessamento da query
@@ -310,7 +291,7 @@ Contexto:
         docs: list[Document],
         history: list[dict[str, Any]],
     ) -> str:
-        """Gera resposta usando a chain otimizada."""
+        """Gera resposta usando a chain."""
         context = self._format_docs(docs)
         history_messages = self._format_history(history)
         

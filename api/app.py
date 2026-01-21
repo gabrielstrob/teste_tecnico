@@ -143,7 +143,7 @@ async def chat_endpoint(request: Request) -> Response:
     session_id = session_id or str(uuid.uuid4())
     history = await fetch_history(pool, session_id, limit=settings.max_history)
     
-    # Usa pipeline otimizado que combina retrieve + generate
+    # Usa pipeline que combina retrieve + generate
     answer, docs = await run_rag_pipeline(pool, settings, question, history)
     await persist_history(pool, session_id, question, answer)
 

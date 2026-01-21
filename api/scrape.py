@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Scraping e persistencia vetorial otimizada."""
+"""Scraping e persistencia vetorial."""
 
 import asyncio
 import logging

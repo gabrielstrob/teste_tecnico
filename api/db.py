@@ -28,7 +28,7 @@ async def create_pool(settings: Settings) -> asyncpg.Pool:
 
 
 async def init_db(pool: asyncpg.Pool, embedding_dim: int) -> None:
-    """Cria tabelas e indices otimizados para RAG.
+    """Cria tabelas e indices para RAG.
     
     Usa indice HNSW ao inves de IVFFlat por ser:
     - Mais rapido para buscas (O(log n) vs O(n/lists))

@@ -34,7 +34,7 @@ class Settings:
     embedding_dim: int
     top_k: int
     similarity_threshold: float
-    # Novos parametros de otimizacao
+    # Parametros de otimizacao
     chunk_size: int
     chunk_overlap: int
     ef_search: int
