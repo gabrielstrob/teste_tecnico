@@ -26,21 +26,17 @@ services:
       retries: 5
 
 
-  # ==================== API (Backend) ====================
   api:
     build: .
     container_name: api_rag
     restart: always
+    env_file:
+      - .env
     environment:
+      # Overrides de rede para o ambiente Docker
       - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=postgres
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      # URL correta da Wikipedia
-      - SCRAPE_URL=http://pt.wikipedia.org/wiki/Intelig%C3%AAncia_artificial
-      - SCRAPE_ON_STARTUP=true
       - OLLAMA_URL=http://ollama:11434
+      # As demais variaveis (MODEL, SCOPE_URL, etc) virão do .env
     ports:
       - "8000:8000"
     depends_on:

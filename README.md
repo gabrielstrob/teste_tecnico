@@ -2,17 +2,70 @@
 
 API de chatbot com Retrieval-Augmented Generation (RAG) utilizando LLM local (Ollama), embeddings locais e PostgreSQL com PGVector para armazenamento vetorial.
 
-
 ## Tecnologias
 
 - **Backend**: Python 3.10+ com Litestar
 - **LLM Local**: Ollama (Phi3, Mistral, Llama3, etc.)
-- **Embeddings**: SentenceTransformers (all-MiniLM-L6-v2)
+- **Embeddings**: SentenceTransformers (paraphrase-multilingual-MiniLM-L12-v2)
 - **Banco de Dados**: PostgreSQL com extensão PGVector
 - **Orquestração LLM**: LangChain
 - **Web Scraping**: Playwright + BeautifulSoup4
 - **OCR**: Tesseract + pdf2image (para PDFs escaneados)
 - **Containerização**: Docker Compose
+
+## Como Executar
+
+O projeto é 100% containerizado.
+
+### 1. Configuração
+
+Crie um arquivo `.env` na raiz do projeto (use `env.example` como base):
+
+```env
+# Banco de Dados
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=postgres
+DB_USER=postgres
+DB_PASSWORD=postgres
+
+# Ollama (LLM Local)
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=qwen3
+
+# Scraping
+SCRAPE_URL=http://pt.wikipedia.org/wiki/Intelig%C3%AAncia_artificial
+SCRAPE_ON_STARTUP=true
+
+# Embeddings
+EMBEDDING_MODEL=paraphrase-multilingual-MiniLM-L12-v2
+EMBEDDING_DIM=384
+TOP_K=10
+```
+
+### 2. Iniciar Aplicação
+
+Execute o comando abaixo, na pasta raiz do projeto, para construir e subir todos os containers:
+
+```bash
+docker-compose up -d --build
+```
+
+### 3. Baixar Modelo LLM
+
+Após os containers subirem, baixe o modelo escolhido no Ollama (ex: qwen3):
+
+```bash
+docker exec -it llm_service ollama pull qwen3
+```
+
+### 4. Acessar Serviços
+
+- **API RAG**: http://localhost:8000
+- **n8n (Fluxo)**: http://localhost:5678
+- **Ollama**: http://localhost:11434
+
+---
 
 ## Funcionalidades
 
@@ -46,90 +99,29 @@ question: Resuma o documento (opcional)
 session_id: uuid (opcional)
 ```
 
+**Exemplo de Resposta:**
+```json
+{
+  "session_id": "uuid-da-sessao",
+  "answer": "A inteligência artificial é...",
+  "sources": [
+    {
+      "source": "documento.pdf",
+      "score": 0.85,
+      "metadata": { "page": 1 }
+    }
+  ]
+}
+```
+
 ### POST /scrape
-Realiza scraping da URL configurada em `SCRAPE_URL`.
+Realiza scraping da URL configurada em `SCRAPE_URL`. Também aceita uma URL específica no corpo da requisição para scraping sob demanda.
 
 **Funcionalidades:**
 - Coleta conteúdo da página web
 - Limpa HTML e extrai texto
 - Divide em chunks com overlap
 - Gera embeddings e armazena no banco
-
-## Configuração
-
-### Variáveis de Ambiente
-
-Crie um arquivo `.env` na raiz do projeto:
-
-```env
-# Banco de Dados
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=rag_db
-DB_USER=postgres
-DB_PASSWORD=postgres
-
-# Ollama (LLM Local)
-OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL=phi3
-
-# Scraping
-SCRAPE_URL=https://pt.wikipedia.org/wiki/Inteligência_artificial
-SCRAPE_ON_STARTUP=false
-
-# Embeddings
-EMBEDDING_MODEL=all-MiniLM-L6-v2
-EMBEDDING_DIM=384
-```
-
-## Execução
-
-### Opção 1: Docker Compose (Recomendado)
-
-**1. Suba todos os containers:**
-```bash
-docker-compose up -d --build
-```
-
-**2. Baixe o modelo do Ollama:**
-```bash
-docker exec -it llm_service ollama pull phi3
-```
-
-**3. Acesse os serviços:**
-- API RAG: http://localhost:8000
-- n8n: http://localhost:5678
-- Ollama: http://localhost:11434
-
-### Opção 2: Execução Local
-
-**1. Suba apenas os serviços de infraestrutura:**
-```bash
-docker-compose up -d postgres ollama
-```
-
-**2. Baixe o modelo do Ollama:**
-```bash
-docker exec -it llm_service ollama pull phi3
-```
-
-**3. Crie e ative o ambiente virtual:**
-```bash
-python -m venv .venv
-.venv\Scripts\activate  # Windows
-source .venv/bin/activate  # Linux/Mac
-```
-
-**4. Instale as dependências:**
-```bash
-pip install -r api/requirements.txt
-playwright install chromium
-```
-
-**5. Execute a API:**
-```bash
-python -m uvicorn api.app:app --host 0.0.0.0 --port 8000
-```
 
 ## Estrutura do Projeto
 
@@ -161,7 +153,7 @@ python -m uvicorn api.app:app --host 0.0.0.0 --port 8000
 
 **Para perguntas de texto:**
 - Method: `POST`
-- URL: `http://api:8000/chat` (dentro do Docker) ou `http://localhost:8000/chat` (local)
+- URL: `http://api:8000/chat` (dentro da rede Docker)
 - Body Content Type: `JSON`
 - Body:
 ```json
@@ -178,6 +170,7 @@ python -m uvicorn api.app:app --host 0.0.0.0 --port 8000
 - Body Parameters:
   - `file`: (tipo File) - arquivo binário
   - `session_id`: (tipo Text) - opcional
+
 
 ## Comandos Docker Úteis
 
@@ -208,11 +201,3 @@ docker-compose build api
 | PDF | `.pdf` | Suporte a OCR para PDFs escaneados |
 | CSV | `.csv` | Conversão automática para texto |
 | Excel | `.xls`, `.xlsx` | Conversão automática para texto |
-
-## Dependências do Sistema (para OCR local)
-
-Se executar fora do Docker e precisar de OCR:
-
-**Windows:**
-- Tesseract: https://github.com/UB-Mannheim/tesseract/wiki
-- Poppler: https://github.com/osborn/poppler-windows/releases
