@@ -1,0 +1,301 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "initialMessages": "Olá! Como posso te ajudar?",
+        "options": {
+          "allowFileUploads": true,
+          "allowedFilesMimeTypes": "application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -1216,
+        912
+      ],
+      "id": "29308ea5-b99a-46ae-aeed-643ebd4caf4f",
+      "name": "When chat message received",
+      "webhookId": "chat-rag-webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "e2d233c3-3326-4fbe-a32b-eb1cb4f10270",
+      "name": "Responder ao Webhook1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "success",
+              "name": "success",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "answer",
+              "name": "answer",
+              "value": "={{ $json.answer || 'Sem resposta' }}",
+              "type": "string"
+            },
+            {
+              "id": "sources",
+              "name": "sources",
+              "value": "={{ $json.sources || [] }}",
+              "type": "array"
+            },
+            {
+              "id": "session",
+              "name": "session_id",
+              "value": "={{ $json.session_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "654e9942-c385-4e72-8b98-f5e40f7aa608",
+      "name": "Formatar Resposta",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [
+        544,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Preparar arquivos para upload via multipart/form-data\n// Retorna um item POR ARQUIVO para usar em loop no n8n\n\nconst item = $input.first();\n\nconst sessionId =\n  item.json.sessionId ||\n  item.json.session_id ||\n  item.json.body?.sessionId ||\n  'session_' + Date.now();\n\nconst question =\n  item.json.chatInput ||\n  item.json.body?.chatInput ||\n  item.json.body?.message ||\n  'Analise este arquivo';\n\n// Pegar TODOS os binários disponíveis\nconst binaryKeys = item.binary ? Object.keys(item.binary) : [];\n\nif (!binaryKeys.length) {\n  throw new Error('Nenhum arquivo binário encontrado.');\n}\n\n// Cria um item de saída para CADA arquivo encontrado\nconst outputItems = [];\n\nbinaryKeys.forEach((key, index) => {\n  const binaryObj = item.binary[key];\n  \n  if (binaryObj?.data) {\n    const fileName = binaryObj.fileName || `arquivo_${index}.pdf`;\n    \n    outputItems.push({\n      json: {\n        session_id: sessionId,\n        question: question,\n        file_name: fileName,\n        file_index: index,\n        total_files: binaryKeys.length,\n      },\n      binary: {\n        file: {\n          data: binaryObj.data,\n          mimeType: binaryObj.mimeType || 'application/octet-stream',\n          fileName: fileName,\n        }\n      }\n    });\n  }\n});\n\n// Retorna N itens (um para cada arquivo)\nreturn outputItems;"
+      },
+      "id": "daa37ed0-011f-4aac-b83e-1289ac973ca6",
+      "name": "Processar Arquivo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/chat",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session_id",
+              "value": "={{ $json.session_id }}"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "file"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "id": "6ca2ffd5-492d-45c8-b56c-8ef94f18bda5",
+      "name": "API - Upload Arquivos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -576,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/chat",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "question",
+              "value": "={{ $('When chat message received').item.json.chatInput }}"
+            },
+            {
+              "name": "session_id",
+              "value": "={{ $('When chat message received').item.json.sessionId }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "80e2ba0e-1203-47f8-ad64-17c55111d047",
+      "name": "API - Chat Pergunta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        128,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "has-file",
+              "leftValue": "={{ !!$json.files?.length || !!Object.keys($binary || {}).length }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0fce68f8-00ee-466f-82fa-318284226da5",
+      "name": "Verificar se tem Arquivo",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": "={{ false }}"
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -240,
+        560
+      ],
+      "id": "0fb09b94-c7bb-4531-8b44-bc6e1bab33e7",
+      "name": "Loop Over Items"
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Verificar se tem Arquivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatar Resposta": {
+      "main": [
+        [
+          {
+            "node": "Responder ao Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Arquivo": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API - Upload Arquivos": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API - Chat Pergunta": {
+      "main": [
+        [
+          {
+            "node": "Formatar Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar se tem Arquivo": {
+      "main": [
+        [
+          {
+            "node": "Processar Arquivo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "API - Chat Pergunta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "API - Chat Pergunta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "API - Upload Arquivos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1f6af35b24f2483bc11013cffa9c26cfb2aa266f15f67a07bd5438d1acf230bb"
+  }
+}

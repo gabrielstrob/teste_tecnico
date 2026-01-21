@@ -1,0 +1,111 @@
+services:
+  # ==================== POSTGRES ====================
+  postgres:
+    # Usamos a imagem oficial com pgvector já instalado.
+    # Essencial para o requisito da API RAG depois.
+    image: pgvector/pgvector:pg16
+    container_name: db_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres # Banco padrão de manutenção
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Montamos o script para rodar na inicialização:
+      - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    # Healthcheck garante que o n8n só inicie quando o banco estiver pronto
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+  # ==================== API (Backend) ====================
+  api:
+    build: .
+    container_name: api_rag
+    restart: always
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=postgres
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      # URL correta da Wikipedia
+      - SCRAPE_URL=http://pt.wikipedia.org/wiki/Intelig%C3%AAncia_artificial
+      - SCRAPE_ON_STARTUP=true
+      - OLLAMA_URL=http://ollama:11434
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    networks:
+      - app-network
+  # ==================== N8N  ====================
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n_flow
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5678:5678"
+    environment:
+      # Configurações para usar o Postgres em vez do SQLite padrão
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n_db
+      - DB_POSTGRESDB_USER=postgres
+      - DB_POSTGRESDB_PASSWORD=postgres
+      
+      # Segurança básica e identificação do n8n
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=postgres
+      - N8N_BASIC_AUTH_PASSWORD=postgres
+      # Importante para webhooks funcionarem corretamente localmente
+      - WEBHOOK_URL=http://localhost:5678/
+    networks:
+      - app-network
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+  # ==================== OLLAMA ====================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: llm_service
+    restart: unless-stopped
+    # O volume abaixo serve para que os modelos baixados permaneçam salvos
+    volumes:
+      - ollama_data:/root/.ollama
+    # Descomente o bloco abaixo se for utilizar GPU NVIDIA
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "11434:11434"
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+  n8n_data:
+  ollama_data:
+
+networks:
+  app-network:
+    driver: bridge
