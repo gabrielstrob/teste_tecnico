@@ -1,109 +1,22 @@
 {
+  "name": "Chat RAG com Upload de Documentos",
   "nodes": [
     {
       "parameters": {
-        "public": true,
-        "initialMessages": "Olá! Como posso te ajudar?",
-        "options": {
-          "allowFileUploads": true,
-          "allowedFilesMimeTypes": "application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-        }
-      },
-      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
-      "typeVersion": 1.4,
-      "position": [
-        -1216,
-        912
-      ],
-      "id": "29308ea5-b99a-46ae-aeed-643ebd4caf4f",
-      "name": "When chat message received",
-      "webhookId": "chat-rag-webhook"
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ $json }}",
-        "options": {}
-      },
-      "id": "e2d233c3-3326-4fbe-a32b-eb1cb4f10270",
-      "name": "Responder ao Webhook1",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [
-        960,
-        736
-      ]
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "success",
-              "name": "success",
-              "value": true,
-              "type": "boolean"
-            },
-            {
-              "id": "answer",
-              "name": "answer",
-              "value": "={{ $json.answer || 'Sem resposta' }}",
-              "type": "string"
-            },
-            {
-              "id": "sources",
-              "name": "sources",
-              "value": "={{ $json.sources || [] }}",
-              "type": "array"
-            },
-            {
-              "id": "session",
-              "name": "session_id",
-              "value": "={{ $json.session_id }}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "654e9942-c385-4e72-8b98-f5e40f7aa608",
-      "name": "Formatar Resposta",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.3,
-      "position": [
-        544,
-        800
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Preparar arquivos para upload via multipart/form-data\n// Retorna um item POR ARQUIVO para usar em loop no n8n\n\nconst item = $input.first();\n\nconst sessionId =\n  item.json.sessionId ||\n  item.json.session_id ||\n  item.json.body?.sessionId ||\n  'session_' + Date.now();\n\nconst question =\n  item.json.chatInput ||\n  item.json.body?.chatInput ||\n  item.json.body?.message ||\n  'Analise este arquivo';\n\n// Pegar TODOS os binários disponíveis\nconst binaryKeys = item.binary ? Object.keys(item.binary) : [];\n\nif (!binaryKeys.length) {\n  throw new Error('Nenhum arquivo binário encontrado.');\n}\n\n// Cria um item de saída para CADA arquivo encontrado\nconst outputItems = [];\n\nbinaryKeys.forEach((key, index) => {\n  const binaryObj = item.binary[key];\n  \n  if (binaryObj?.data) {\n    const fileName = binaryObj.fileName || `arquivo_${index}.pdf`;\n    \n    outputItems.push({\n      json: {\n        session_id: sessionId,\n        question: question,\n        file_name: fileName,\n        file_index: index,\n        total_files: binaryKeys.length,\n      },\n      binary: {\n        file: {\n          data: binaryObj.data,\n          mimeType: binaryObj.mimeType || 'application/octet-stream',\n          fileName: fileName,\n        }\n      }\n    });\n  }\n});\n\n// Retorna N itens (um para cada arquivo)\nreturn outputItems;"
-      },
-      "id": "daa37ed0-011f-4aac-b83e-1289ac973ca6",
-      "name": "Processar Arquivo",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -560,
-        256
-      ]
-    },
-    {
-      "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:8000/chat",
+        "url": "http://api:8000/chat",
         "sendBody": true,
         "contentType": "multipart-form-data",
         "bodyParameters": {
           "parameters": [
             {
               "name": "session_id",
-              "value": "={{ $json.session_id }}"
+              "value": "={{ $json.sessionId }}"
             },
             {
               "parameterType": "formBinaryData",
               "name": "file",
-              "inputDataFieldName": "file"
+              "inputDataFieldName": "data0"
             }
           ]
         },
@@ -111,30 +24,30 @@
           "timeout": 180000
         }
       },
-      "id": "6ca2ffd5-492d-45c8-b56c-8ef94f18bda5",
+      "id": "64d48b92-df83-4b6b-b4fe-fb28addea7d7",
       "name": "API - Upload Arquivos",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -576,
-        464
+        -96,
+        448
       ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:8000/chat",
+        "url": "http://api:8000/chat",
         "sendBody": true,
         "contentType": "multipart-form-data",
         "bodyParameters": {
           "parameters": [
             {
               "name": "question",
-              "value": "={{ $('When chat message received').item.json.chatInput }}"
+              "value": "={{ $json.chatInput }}"
             },
             {
               "name": "session_id",
-              "value": "={{ $('When chat message received').item.json.sessionId }}"
+              "value": "={{ $json.sessionId }}"
             }
           ]
         },
@@ -142,13 +55,13 @@
           "timeout": 120000
         }
       },
-      "id": "80e2ba0e-1203-47f8-ad64-17c55111d047",
+      "id": "073a0f7b-0fa0-4996-b9a1-255a531c6923",
       "name": "API - Chat Pergunta",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        128,
-        912
+        512,
+        816
       ]
     },
     {
@@ -175,70 +88,148 @@
         },
         "options": {}
       },
-      "id": "0fce68f8-00ee-466f-82fa-318284226da5",
+      "id": "9d4f9c5c-183a-4d10-8f77-db2f7b1cbd4f",
       "name": "Verificar se tem Arquivo",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        -960,
-        912
+        -512,
+        816
       ]
     },
     {
       "parameters": {
-        "options": {
-          "reset": "={{ false }}"
+        "method": "POST",
+        "url": "http://api:8000/scrape",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $json[\"URL:\"] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -656,
+        512
+      ],
+      "id": "adf6578e-84db-418d-a0fe-2fc1d143a0be",
+      "name": "Faz Scrape"
+    },
+    {
+      "parameters": {
+        "formTitle": "URL para Scrape",
+        "formDescription": "Insira a URL a ser feito o scrape",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "URL:"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -944,
+        512
+      ],
+      "id": "666ef735-0917-4e18-ae4c-0c65cdadc77b",
+      "name": "Formulário para realizar scrape",
+      "webhookId": "40e7feb0-038f-4b9f-851e-5b6026e31dae"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Consolida as respostas da API\nconst items = $input.all();\n\n// Filtra apenas itens que contenham answer\nconst validAnswers = items\n  .filter(item => item.json.answer)\n  .map(item => item.json.answer);\n\nif (validAnswers.length === 0) {\n  return {\n    output: \"Desculpe, não consegui encontrar uma resposta clara no momento.\"\n  };\n}\n\n// Retorna a primeira resposta\nreturn {\n  output: validAnswers[0]\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        1136
+      ],
+      "id": "7246dc4e-810f-45b2-896f-e3897f0cd28f",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        -912,
+        1248
+      ],
+      "id": "f471cc7a-31ea-40a3-b316-ea5f5cc1cf14",
+      "name": "Postgres Chat Memory",
+      "alwaysOutputData": false,
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "usoagz9LcQLAFyau",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "ai",
+              "message": "={{ $json.answer }}"
+            },
+            {
+              "type": "user",
+              "message": "={{ $('When chat message received').item.json.sessionId }}"
+            }
+          ]
         }
       },
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
       "position": [
-        -240,
-        560
+        -272,
+        1136
       ],
-      "id": "0fb09b94-c7bb-4531-8b44-bc6e1bab33e7",
-      "name": "Loop Over Items"
+      "id": "bb953462-d7eb-4cb7-a006-17ed9222bd0e",
+      "name": "Chat Memory Manager1",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "public": true,
+        "initialMessages": "Olá, como posso ajudar?",
+        "options": {
+          "allowFileUploads": true,
+          "loadPreviousSession": "memory"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -912,
+        832
+      ],
+      "id": "cb8722ee-1f9e-4345-8ca8-2bdb99dea87e",
+      "name": "When chat message received",
+      "webhookId": "d2eb5b10-e100-4de0-9a7c-2f067984b95d"
     }
   ],
+  "pinData": {},
   "connections": {
-    "When chat message received": {
-      "main": [
-        [
-          {
-            "node": "Verificar se tem Arquivo",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Formatar Resposta": {
-      "main": [
-        [
-          {
-            "node": "Responder ao Webhook",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Processar Arquivo": {
-      "main": [
-        [
-          {
-            "node": "Loop Over Items",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "API - Upload Arquivos": {
       "main": [
         [
           {
-            "node": "Loop Over Items",
+            "node": "API - Chat Pergunta",
             "type": "main",
             "index": 0
           }
@@ -249,7 +240,12 @@
       "main": [
         [
           {
-            "node": "Formatar Resposta",
+            "node": "Chat Memory Manager1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript",
             "type": "main",
             "index": 0
           }
@@ -260,7 +256,7 @@
       "main": [
         [
           {
-            "node": "Processar Arquivo",
+            "node": "API - Upload Arquivos",
             "type": "main",
             "index": 0
           }
@@ -274,18 +270,49 @@
         ]
       ]
     },
-    "Loop Over Items": {
+    "Formulário para realizar scrape": {
       "main": [
         [
           {
-            "node": "API - Chat Pergunta",
+            "node": "Faz Scrape",
             "type": "main",
             "index": 0
           }
-        ],
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
         [
           {
-            "node": "API - Upload Arquivos",
+            "node": "Chat Memory Manager1",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "When chat message received",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Memory Manager1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Verificar se tem Arquivo",
             "type": "main",
             "index": 0
           }
@@ -293,9 +320,16 @@
       ]
     }
   },
-  "pinData": {},
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "3445d674-68c3-4c83-888a-fa89d64a90d3",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "1f6af35b24f2483bc11013cffa9c26cfb2aa266f15f67a07bd5438d1acf230bb"
-  }
+    "instanceId": "0e89ef2dafe27d58c9f4c7563a13aa3e5bd710ab5409b4666491589e7f357092"
+  },
+  "id": "KJU_k26Ib8A0U8-IN75XM",
+  "tags": []
 }

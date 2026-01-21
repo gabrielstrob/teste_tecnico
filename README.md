@@ -61,11 +61,16 @@ docker exec -it llm_service ollama pull qwen3
 
 ### 4. Acessar Serviços
 
-- **API RAG**: http://localhost:8000
-- **n8n (Fluxo)**: http://localhost:5678
-- **Ollama**: http://localhost:11434
+| Serviço | URL Externa (Host) | URL Interna (Docker Network) |
+|---------|-------------------|------------------------------|
+| API RAG | http://localhost:8000 | http://api:8000 |
+| n8n (Fluxo) | http://localhost:5678 | http://n8n:5678 |
+| Ollama | http://localhost:11434 | http://ollama:11434 |
+| PostgreSQL | localhost:5432 | postgres:5432 |
 
 ---
+### 5. Configurar Credenciais do Postgres no n8n
+- Configurar com as mesmas credenciais do .env
 
 ## Funcionalidades
 
